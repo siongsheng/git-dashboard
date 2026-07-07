@@ -113,6 +113,27 @@ export function worktreeExists(worktreeDir: string): boolean {
   return fs.existsSync(worktreeDir);
 }
 
+// --- Remotes / push (for the PR flow) ---
+
+export interface RemoteInfo {
+  hasRemote: boolean;
+  isGitHub: boolean;
+  url: string | null;
+}
+
+export async function getRemoteInfo(repoPath: string): Promise<RemoteInfo> {
+  try {
+    const url = (await git(repoPath).raw(["remote", "get-url", "origin"])).trim();
+    return { hasRemote: true, isGitHub: /github\.com/i.test(url), url };
+  } catch {
+    return { hasRemote: false, isGitHub: false, url: null };
+  }
+}
+
+export async function pushBranch(repoPath: string, branch: string) {
+  await git(repoPath).raw(["push", "-u", "origin", branch]);
+}
+
 // --- Diffs ---
 
 export interface TaskDiff {

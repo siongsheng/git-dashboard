@@ -13,6 +13,7 @@ interface TaskData {
   task: Task;
   runs: AgentRun[];
   repo: Repo;
+  canOpenPr: boolean;
 }
 
 const ACTIVE_RUN_STATUSES = new Set(["starting", "running"]);
@@ -28,7 +29,7 @@ export function TaskDetail({ initial }: { initial: TaskData }) {
   const [busy, setBusy] = useState<string | null>(null);
   const notifiedRuns = useRef<Set<number>>(new Set());
 
-  const { task, runs, repo } = data;
+  const { task, runs, repo, canOpenPr } = data;
   const latestRun = runs[0] ?? null;
   const isLive = latestRun != null && ACTIVE_RUN_STATUSES.has(latestRun.status);
   const viewedRunId = selectedRunId ?? latestRun?.id ?? null;
@@ -115,6 +116,14 @@ export function TaskDetail({ initial }: { initial: TaskData }) {
     if (result) refetch();
   }
 
+  async function openPr() {
+    const result = await act("pr", `/api/tasks/${task.id}/pr`);
+    if (result) {
+      await refetch();
+      if (result.prUrl) window.open(result.prUrl, "_blank", "noopener");
+    }
+  }
+
   async function sendFeedback(text: string) {
     requestNotifyPermission();
     const result = await act("feedback", `/api/tasks/${task.id}/message`, { text });
@@ -156,6 +165,16 @@ export function TaskDetail({ initial }: { initial: TaskData }) {
           {task.maxBudgetUsd != null && <span>cap {formatCost(task.maxBudgetUsd)}</span>}
           {totalCost > 0 && <span>spent {formatCost(totalCost)}</span>}
         </div>
+        {task.prUrl && (
+          <a
+            href={task.prUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex items-center gap-1.5 text-xs text-accent hover:underline"
+          >
+            ⇧ Pull request opened → {task.prUrl}
+          </a>
+        )}
         <p className="mt-3 max-w-3xl whitespace-pre-wrap text-sm text-muted">{task.description}</p>
       </div>
 
@@ -176,6 +195,11 @@ export function TaskDetail({ initial }: { initial: TaskData }) {
             <Button onClick={merge} busy={busy === "merge"} primary>
               ✓ Approve & squash-merge
             </Button>
+            {canOpenPr && (
+              <Button onClick={openPr} busy={busy === "pr"}>
+                ⇧ Open pull request
+              </Button>
+            )}
             <Button onClick={startAgent} busy={busy === "start"}>
               ↻ Fresh run
             </Button>

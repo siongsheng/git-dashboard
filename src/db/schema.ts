@@ -32,6 +32,7 @@ export const tasks = sqliteTable("tasks", {
   branchName: text("branch_name"),
   baseRef: text("base_ref"),
   worktreePath: text("worktree_path"),
+  prUrl: text("pr_url"),
   createdAt: integer("created_at")
     .notNull()
     .$defaultFn(() => Date.now()),

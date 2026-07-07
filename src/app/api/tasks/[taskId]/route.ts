@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { getDb, agentRuns, repos, tasks } from "@/db";
-import { discardTaskBranch } from "@/lib/git";
+import { discardTaskBranch, getRemoteInfo } from "@/lib/git";
 import { getRunManager } from "@/server/run-manager";
 import { jsonError } from "@/lib/api";
 
@@ -19,7 +19,9 @@ export async function GET(_request: Request, { params }: Ctx) {
     .orderBy(desc(agentRuns.id))
     .all();
   const repo = db.select().from(repos).where(eq(repos.id, task.repoId)).get();
-  return NextResponse.json({ task, runs, repo });
+  const remote = repo ? await getRemoteInfo(repo.path) : { hasRemote: false, isGitHub: false };
+  const canOpenPr = remote.hasRemote && remote.isGitHub;
+  return NextResponse.json({ task, runs, repo, canOpenPr });
 }
 
 export async function DELETE(_request: Request, { params }: Ctx) {
