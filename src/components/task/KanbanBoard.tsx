@@ -16,6 +16,7 @@ const COLUMNS: { key: string; title: string; statuses: string[] }[] = [
 
 export function KanbanBoard({ tasks }: { tasks: Task[] }) {
   const router = useRouter();
+  const [query, setQuery] = useState("");
   const hasRunning = tasks.some((t) => t.status === "running");
 
   // Light polling keeps the board fresh while agents are working.
@@ -25,10 +26,28 @@ export function KanbanBoard({ tasks }: { tasks: Task[] }) {
     return () => clearInterval(id);
   }, [hasRunning, router]);
 
+  const q = query.trim().toLowerCase();
+  const visibleTasks = q
+    ? tasks.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          t.description.toLowerCase().includes(q),
+      )
+    : tasks;
+
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="space-y-4">
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search tasks…"
+        aria-label="Search tasks"
+        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-faint focus:border-accent focus:outline-none sm:w-72"
+      />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
       {COLUMNS.map((col) => {
-        const colTasks = tasks.filter((t) => col.statuses.includes(t.status));
+        const colTasks = visibleTasks.filter((t) => col.statuses.includes(t.status));
         return (
           <div key={col.key} className="rounded-lg border border-border bg-surface/50">
             <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
@@ -41,7 +60,9 @@ export function KanbanBoard({ tasks }: { tasks: Task[] }) {
             </div>
             <div className="flex min-h-24 flex-col gap-2 p-2">
               {colTasks.length === 0 ? (
-                <p className="px-2 py-6 text-center text-xs text-faint">Empty</p>
+                <p className="px-2 py-6 text-center text-xs text-faint">
+                  {q ? "No matches" : "Empty"}
+                </p>
               ) : (
                 colTasks.map((task) => <TaskCard key={task.id} task={task} />)
               )}
@@ -49,6 +70,7 @@ export function KanbanBoard({ tasks }: { tasks: Task[] }) {
           </div>
         );
       })}
+      </div>
     </div>
   );
 }
