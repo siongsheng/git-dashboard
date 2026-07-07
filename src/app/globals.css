@@ -1,26 +1,91 @@
 @import "tailwindcss";
 
+/* Committed dark developer-tool theme */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0b0c0f;
+  --surface: #131519;
+  --surface-2: #1a1d23;
+  --border: #262a33;
+  --border-strong: #363b47;
+  --foreground: #e6e8ec;
+  --muted: #8b919e;
+  --faint: #5c6270;
+  --accent: #7c8cf8;
+  --accent-strong: #5b6cf0;
+
+  --status-queued: #8b919e;
+  --status-running: #58a6ff;
+  --status-review: #e3b341;
+  --status-done: #3fb950;
+  --status-failed: #f85149;
+
+  --diff-add-bg: rgba(63, 185, 80, 0.14);
+  --diff-del-bg: rgba(248, 81, 73, 0.14);
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-status-queued: var(--status-queued);
+  --color-status-running: var(--status-running);
+  --color-status-review: var(--status-review);
+  --color-status-done: var(--status-done);
+  --color-status-failed: var(--status-failed);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+::selection {
+  background: rgba(124, 140, 248, 0.35);
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 5px;
+  border: 2px solid var(--background);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+.pulse-dot {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+.diff-line-add {
+  background: var(--diff-add-bg);
+}
+.diff-line-del {
+  background: var(--diff-del-bg);
 }
