@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentRun, Repo, Task } from "@/db/schema";
 import { StatusBadge, TypeBadge } from "@/components/StatusBadge";
 import { AgentTimeline } from "@/components/run/AgentTimeline";
@@ -27,6 +27,7 @@ export function TaskDetail({ initial }: { initial: TaskData }) {
   const [diffKey, setDiffKey] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [prState, setPrState] = useState<string | null>(null);
   const notifiedRuns = useRef<Set<number>>(new Set());
 
   const { task, runs, repo, canOpenPr } = data;
@@ -124,6 +125,40 @@ export function TaskDetail({ initial }: { initial: TaskData }) {
     }
   }
 
+  // Reconcile with GitHub: if the PR was merged there, this marks the task done
+  // and cleans up. Used by the manual button and the background poll.
+  const syncPr = useCallback(
+    async (manual: boolean) => {
+      if (manual) {
+        setBusy("pr-status");
+        setActionError(null);
+      }
+      const res = await fetch(`/api/tasks/${task.id}/pr-status`, { method: "POST" });
+      if (manual) setBusy(null);
+      if (!res.ok) {
+        if (manual) {
+          const b = await res.json().catch(() => ({}));
+          setActionError(b.error ?? "Could not check PR status");
+        }
+        return;
+      }
+      const info = (await res.json()) as { state: string; changed: boolean };
+      setPrState(info.state);
+      if (info.changed) refetch();
+    },
+    [task.id, refetch],
+  );
+
+  // Auto-poll PR state while a PR is open and the task is still in review.
+  const shouldPollPr = task.status === "awaiting_review" && !!task.prUrl;
+  useEffect(() => {
+    if (!shouldPollPr) return;
+    const id = setInterval(() => {
+      void syncPr(false);
+    }, 30000);
+    return () => clearInterval(id);
+  }, [shouldPollPr, syncPr]);
+
   async function sendFeedback(text: string) {
     requestNotifyPermission();
     const result = await act("feedback", `/api/tasks/${task.id}/message`, { text });
@@ -166,14 +201,17 @@ export function TaskDetail({ initial }: { initial: TaskData }) {
           {totalCost > 0 && <span>spent {formatCost(totalCost)}</span>}
         </div>
         {task.prUrl && (
-          <a
-            href={task.prUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-2 inline-flex items-center gap-1.5 text-xs text-accent hover:underline"
-          >
-            ⇧ Pull request opened → {task.prUrl}
-          </a>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            <a
+              href={task.prUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-accent hover:underline"
+            >
+              ⇧ Pull request → {task.prUrl}
+            </a>
+            {prState && <PrStatePill state={prState} />}
+          </div>
         )}
         <p className="mt-3 max-w-3xl whitespace-pre-wrap text-sm text-muted">{task.description}</p>
       </div>
@@ -195,9 +233,14 @@ export function TaskDetail({ initial }: { initial: TaskData }) {
             <Button onClick={merge} busy={busy === "merge"} primary>
               ✓ Approve & squash-merge
             </Button>
-            {canOpenPr && (
+            {canOpenPr && !task.prUrl && (
               <Button onClick={openPr} busy={busy === "pr"}>
                 ⇧ Open pull request
+              </Button>
+            )}
+            {task.prUrl && (
+              <Button onClick={() => syncPr(true)} busy={busy === "pr-status"}>
+                ⟳ Check PR status
               </Button>
             )}
             <Button onClick={startAgent} busy={busy === "start"}>
@@ -360,6 +403,20 @@ function Button({
     >
       {busy ? "Working…" : children}
     </button>
+  );
+}
+
+function PrStatePill({ state }: { state: string }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    OPEN: { label: "PR open", cls: "text-status-running border-status-running/30 bg-status-running/10" },
+    MERGED: { label: "PR merged", cls: "text-status-done border-status-done/30 bg-status-done/10" },
+    CLOSED: { label: "PR closed (not merged)", cls: "text-status-failed border-status-failed/30 bg-status-failed/10" },
+  };
+  const s = map[state] ?? { label: state, cls: "text-muted border-border bg-surface-2" };
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${s.cls}`}>
+      {s.label}
+    </span>
   );
 }
 
